@@ -1,0 +1,39 @@
+sudo: required
+services:
+- docker
+addons:
+  apt:
+    packages:
+    - openconnect
+before_install:
+- pip install awscli --upgrade --user
+- eval $(aws ecr get-login --region us-east-1 --no-include-email)
+- curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+- chmod +x ./kubectl
+- mv ./kubectl $HOME/kubectl
+- openssl aes-256-cbc -K $encrypted_da1d79c22a97_key -iv $encrypted_da1d79c22a97_iv -in kube.config.enc -out kube.config -d
+- mkdir -p $HOME/.kube/ && mv kube.config $HOME/.kube/config
+script:
+- if [ "$TRAVIS_TAG" == "" ]; then
+    docker build -t 234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:$TRAVIS_BRANCH-$TRAVIS_COMMIT .
+    docker push 234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:$TRAVIS_BRANCH-$TRAVIS_COMMIT
+  else
+    docker build -t 234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:$TRAVIS_TAG .
+    docker push 234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:$TRAVIS_TAG
+    
+    docker tag 234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:latest 234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:$TRAVIS_TAG
+    docker push  234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:latest
+  fi
+after_success:
+- echo $VPNPASS | sudo openconnect vpnaccess.nd.edu -b --user=$VPNUSER --passwd-on-stdin
+- if [ "$TRAVIS_TAG" == "" ]; then
+    $HOME/kubectl -n development set image deployment/development-cyberspatial-geoserver cyberspatial=234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:$TRAVIS_BRANCH-$TRAVIS_COMMIT
+  else
+    $HOME/kubectl -n staging set image staging/staging-cyberspatial-geoserver cyberspatial=234514569215.dkr.ecr.us-east-1.amazonaws.com/geoserver:$TRAVIS_TAG
+  fi
+env:
+  global:
+  - secure: rqGztuhDW2lod+UgGuIoVLi2BGX/4ma0809O4gsD6bKqIEi3eW0ucob8d/aPTo2GnjfJWdWiXeDhO1bfGzNuq+REqT0rPvqOAUm5ufymur6GQKhwKjapcfObSObaszUKbQRH8E4R9yDNh/GN58gnp/WZq+MQtTQTWGbLlLfG4lxu0dH90ZMM0jC8HuK85F+q6EkXGJn/ldjnrVsgTyftRgvARUQJWyquh+67ZtP/gVtKNG+8fj4X4+dlBJd6q13ia7yInGc4FkODz5xaR/lDc4ZSTMnq7QAjy2c63SKziFaqmfzTWe35DsaA8FonAqK7rQVbFKQNjNUjOMGTwmsDdVcRndUegwDhFYvxryWKFlBtpnS+hHg/aP5nKzzkBIDKT6gha8nl9yC/aK9y+hs+NPYzXOVbFCHQuFh8Khv2FX5+DsB2ayTqQ68X0cmYIAd63HcV0IsNAYY7TtdUdgf7/O17RfUcaGoO2XKj9DiX3e7a9yeCw2Wiq/KaRph0c/GRqaoEKCB+F1snvhk+FYPxLq1yckSErltEjboBxfovv5pBhaBLaKIOQake5ViJRXtELh7eHf0e6IGkzbCJSmKUE3GuW8H+4Drt6WtdRstHFHSin3v1Ch/gywqPohzxp1FhVnLoycXpBgW9kA5YrevsTc3fLugN3C6WLnTl6+2E8Pg=
+  - secure: AUEAQBrj9p7mDDJCgSjSxyH0lmWIWndYVsU4PA6Jczv8g9QsrYkbdka1Whgx1ZfNbfP11KMy719j/p5Ny739ohap/4bSXtKPQDD2C6EkSwwiPsrXmad2P4uEQck8ele4PG+LUErg0NJwdwjG1HiF47Ojeuna8BuCjzUGAQj+MIDmr+NBnttZwz5+gDhw0i9Wrj/fcgddqmPUCN64Um1CbAbSvMJ/miCLliRri4BhoO2Mqsdlh4BJCacOLcCyetTcDbLloF9L8JHaURkfnrwjlN+396qlG/Izs9E0yrqz7gNnatOHv0lcn5UeEiAJPbAvj9RvkBIs/5M+H316mVnFQAiJ3OrY2YjeOJrrV6FdlyFCZK98sqzqVaxFVXjHxcf4zVkcpau2Ik2t9V5ck8IFfLtIMqbiLFefT11CYCA6l75lHO8WSXmI1sKnDS36a7M+NBNULFzPuyc1u5xrpV9WB4JxeujDTFYZObE6AzyVIiV5SvROzFnUdZ9+VGiX1Jio6dYvX0CKkAvYI3ZXQUYxcrkF7F8XuD8eVN3lV7H37P3n9KEead/XCEzScjFLcMsgrOy709KgcVdgEOlX96hVTfMOx/CW1LqhBox5M8YsDoRJjDUz8S4XscoOzBM1ZDIU3RESd9VSxBmoK6c+oN4vPmtRFTAxaNETmfHBozeZMAY=
+  - secure: Km2RGm+RII2/0QPcg/DFnJAYHan22lXmLpq7h/4IthV36GDxnQIi/RufmvZxkEys0f7/KeWiPODSrPYkWY1FK4N2Y9cd/QRzYXynBsLRuJ5p3EdpLfIhg1LXDPPv70aV0eytnvy+4tLPyg3RI8DcbMUDxnI7iMxiOo7Kq6f73oHEBFMVFjjrHxFhRxg1IwszdudB6I5UrFHf21Pnn1pigWVRs7voD8giW0adeQFbvZ5x/Yu1bw6UgxXcupD0prrORiPGJGGfn6+3cSAlSGAJwFeXSVeZCq/dXo6yd9AQbWGukicqB5ZcgZ9YreM4uOt69BdUmb8nw7ROn2z2Jp4ETZ87IAwZhiPgIxisRkZo3qSdWzplTkJw6nj5P576lLLy83UbZ8dyFiHsWDLTbaD58QSsrX7wZPDIwoPBSRJMPemPyEy/zbhR11gMlH8rBP4F0AfT3fdd1CzspoHblFLSwY4y3mrOboTf5zMlEGSF3tspUlERh61LpJuJtEdhmxcVCGiwlpL75R2Gkq795f64shF+/YFXJzPZDqd76Tm03EKYXGriXHxioUH2eLahwIiKOjAO3hnpgD9oBYS1yElfM1sjm80N/mx+LuT0yZpUCGjmbQg7Uhgc8xDFny3cFJXmDR3Gfiuq9Rjiti4/zJECWSVE+dKa27C/cq+MjUzSXWY=
+  - secure: BqoWOzH7ba6uqGusWDwsvHoTnTNI5dEQLL1aEP4LfxOKwnNRVjFCMDkVLqSUboqi5egkNoYBrnci5USAwxINuOD6DYa0p5ojdVENsqJLvFgmGITFxapebW17epUHnUz8Ts9oscVMH9R2BlwrtSAP1kdnaomPUupyio7EKhfcVjRF0LmdXJdwcaWJS8vFIwgEgr6v86oe76FxPVjlr0xc2OcB5VXbtaEaBNX4qOYTyDeAeW7tImZO4ozxF5lkCltMUzIXKu1eDYbjOGWSCd1d3T5mvZS5td46GLZR31JUI95pYgFu5GOyUT6JA9TOMRnTuWXUUHAJuCENx8Zeo7GZxtXhbha+0FO/e0ljuDa+yvUrY5t8GTobVvbv5KLC5g5y8Pjn1h1U55XL6Kku330RPGzzIgaOtgONSdyb9z3bzO7FesbRnIAfGAKOvX8PNFyJ6SxctnoZecl9lF3uYaVfnlrr6HkO8d40rv0+AlS4cZL2ftZkCQiwIcRRCy18+ijS8NuadViKkXFdbsMmAj5WCLzIk9Zldg0VI2sQZdS/6hX2cZ1UZwQj4zrd2DdWHPJquk2apFGE0rTvAOqUgf+KcYTZdN124ta77Qyt5PbIz6mOqHD2O6IjDSHleyLwwQPQSSgfjjylOqKlqeqhqj3/1YgmdyQpc3tmE9OA6AQSMgs=
