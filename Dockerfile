@@ -20,7 +20,8 @@ RUN cd /usr/local/tomcat/webapps \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git libgeos-dev libproj-dev && \
     ln -s /usr/lib/x86_64-linux-gnu/libproj.so /usr/lib/libproj.so.0 && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    printf "\norg.apache.catalina.startup.ContextConfig.jarsToSkip=bcprov*.jar" >> /usr/local/tomcat/conf/catalina.properties
 
 VOLUME $GEOSERVER_DATA_DIR
 
